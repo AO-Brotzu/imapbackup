@@ -1,0 +1,8 @@
+version: '2.2'
+
+services:
+    imapbackup:
+        build: ./docker/app/
+        container_name: imapbackup
+        volumes:
+          - ./src/:/opt/aob/imapbackup
