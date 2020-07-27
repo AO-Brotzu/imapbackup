@@ -267,18 +267,28 @@ def scan_file(filename, compress, overwrite, nospinner):
     return messages
 
 
-def scan_folder(server, foldername, nospinner):
+def scan_folder(server, foldername, nospinner, datarange=""):
     """Gets IDs of messages in the specified folder, returns id:num dict"""
     messages = {}
     spinner = Spinner("Folder %s" % foldername, nospinner)
+
     try:
+        
         typ, data = server.select(foldername, readonly=True)
+
         if 'OK' != typ:
             raise SkipFolderException("SELECT failed: %s" % data)
-        num_msgs = int(data[0])
-
+        else:
+            num_msgs = int(data[0])
+            message_ids = range(1, num_msgs+1)
+        
+        if datarange != "":
+            print" Data range filter: %s" % datarange
+            typ, data = server.search(None, datarange)
+            message_ids = data[0].split()
+        
         # each message
-        for num in range(1, num_msgs+1):
+        for num in message_ids:
             # Retrieve Message-Id, making sure we don't mark all messages as read
             typ, data = server.fetch(
                 num, '(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])')
@@ -422,6 +432,7 @@ def print_usage():
     print "Usage: imapbackup [OPTIONS] -s HOST -u USERNAME [-p PASSWORD]"
     print " -a --append-to-mboxes     Append new messages to mbox files. (default)"
     print " -y --yes-overwrite-mboxes Overwite existing mbox files instead of appending."
+    print " -d --data-range=''        Data range filter (optional)"
     print " -n --compress=none        Use one plain mbox file for each folder. (default)"
     print " -z --compress=gzip        Use mbox.gz files.  Appending may be very slow."
     print " -b --compress=bzip2       Use mbox.bz2 files. Appending not supported: use -y."
@@ -446,8 +457,8 @@ def process_cline():
     """Uses getopt to process command line, returns (config, warnings, errors)"""
     # read command line
     try:
-        short_args = "aynzbekt:c:s:u:p:f:"
-        long_args = ["append-to-mboxes", "yes-overwrite-mboxes", "compress=",
+        short_args = "aynzbekt:c:s:u:p:f:d:"
+        long_args = ["append-to-mboxes", "yes-overwrite-mboxes","data-range=" "compress=",
                      "ssl", "timeout", "keyfile=", "certfile=", "server=", "user=", "pass=",
                      "folders=", "thunderbird", "nospinner"]
         opts, extraargs = getopt.getopt(sys.argv[1:], short_args, long_args)
@@ -455,7 +466,7 @@ def process_cline():
         print_usage()
 
     warnings = []
-    config = {'compress': 'none', 'overwrite': False, 'usessl': False,
+    config = {'compress': 'none', 'overwrite': False, 'datarange':'', 'usessl': True,
               'thunderbird': False, 'nospinner': False}
     errors = []
 
@@ -470,6 +481,9 @@ def process_cline():
         elif option in ("-y", "--yes-overwrite-mboxes"):
             warnings.append("Existing mbox files will be overwritten!")
             config["overwrite"] = True
+        # data range filter, example '(since "27-Jul-2020" before "28-Jul-2020")'
+        elif option in ("-d", "--data-range"):
+            config['datarange'] = value
         elif option == "-n":
             config['compress'] = 'none'
         elif option == "-z":
@@ -691,7 +705,7 @@ def main():
             try:
                 foldername, filename = name_pair
                 fol_messages = scan_folder(
-                    server, foldername, config['nospinner'])
+                    server, foldername, config['nospinner'], config['datarange'])
                 fil_messages = scan_file(filename, config['compress'],
                                          config['overwrite'], config['nospinner'])
                 new_messages = {}
