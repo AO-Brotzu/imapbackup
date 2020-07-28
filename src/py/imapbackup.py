@@ -207,9 +207,13 @@ def download_messages(server, filename, messages, config):
                                                   pretty_byte_count(biggest))
 
 
-def scan_file(filename, compress, overwrite, nospinner):
+def scan_file(filename, config):
     """Gets IDs of messages in the specified mbox file"""
     # file will be overwritten
+    compress = config['compress']
+    overwrite = config['overwrite']
+    nospinner = config['nospinner']
+  
     if overwrite:
         return []
     else:
@@ -222,6 +226,9 @@ def scan_file(filename, compress, overwrite, nospinner):
 
     spinner = Spinner("File %s" % filename, nospinner)
 
+    if not os.path.exists(os.path.dirname(filename)):
+        os.makedirs(os.path.dirname(filename))
+    
     # open the file
     if compress == 'gzip':
         mbox = gzip.GzipFile(filename, 'rb')
@@ -389,8 +396,12 @@ def get_hierarchy_delimiter(server):
     return hierarchy_delim
 
 
-def get_names(server, compress, thunderbird, nospinner):
+def get_names(server, config):
     """Get list of folders, returns [(FolderName,FileName)]"""
+
+    compress    = config['compress']
+    thunderbird = config['thunderbird']
+    nospinner   = config['nospinner']
 
     spinner = Spinner("Finding Folders", nospinner)
 
@@ -418,6 +429,13 @@ def get_names(server, compress, thunderbird, nospinner):
             filename = '.'.join(foldername.split(delim)) + '.mbox' + suffix
         # print "\n*** Folder:", foldername # *DEBUG
         # print "***   File:", filename # *DEBUG
+
+        filename = config['backupPath']+filename
+
+        #create directory if not exists
+        if not os.path.exists(os.path.dirname(filename)):
+            os.makedirs(os.path.dirname(filename))
+
         names.append((foldername, filename))
 
     # done
@@ -449,7 +467,8 @@ def print_usage():
     print " -t SECS --timeout=SECS    Sets socket timeout to SECS seconds."
     print " --thunderbird             Create Mozilla Thunderbird compatible mailbox"
     print " --nospinner               Disable spinner (makes output log-friendly)"
-    print "\nNOTE: mbox files are created in the current working directory."
+    print " --backup-path=<path>    Path of the folder containing mbox files (default current working Directory)."
+
     sys.exit(2)
 
 
@@ -460,14 +479,14 @@ def process_cline():
         short_args = "aynzbekt:c:s:u:p:f:d:"
         long_args = ["append-to-mboxes", "yes-overwrite-mboxes","data-range=" "compress=",
                      "ssl", "timeout", "keyfile=", "certfile=", "server=", "user=", "pass=",
-                     "folders=", "thunderbird", "nospinner"]
+                     "folders=", "thunderbird", "nospinner","backup-path="]
         opts, extraargs = getopt.getopt(sys.argv[1:], short_args, long_args)
     except getopt.GetoptError:
         print_usage()
 
     warnings = []
     config = {'compress': 'none', 'overwrite': False, 'datarange':'', 'usessl': True,
-              'thunderbird': False, 'nospinner': False}
+              'thunderbird': False, 'nospinner': False, 'backupPath':'./'}
     errors = []
 
     # empty command line
@@ -518,9 +537,14 @@ def process_cline():
             config['thunderbird'] = True
         elif option == "--nospinner":
             config['nospinner'] = True
+        elif option in ("-p", "--backup-path"):
+            config['backupPath'] = value
         else:
             errors.append("Unknown option: " + option)
 
+    if config['backupPath'] != "./" :
+        config['backupPath'] = config['backupPath'] + config['user'] + "/" + dataRangePath(config['datarange'])
+    
     # don't ignore extra arguments
     for arg in extraargs:
         errors.append("Unknown argument: " + arg)
@@ -528,6 +552,10 @@ def process_cline():
     # done processing command line
     return config, warnings, errors
 
+def dataRangePath(datarange):
+    if datarange == "":
+         return ""
+    return "datarangetodo/"
 
 def check_config(config, warnings, errors):
     """Checks the config for consistency, returns (config, warnings, errors)"""
@@ -588,6 +616,8 @@ def get_config():
     #   'usessl': True or False
     #   'keyfilename': String or None
     #   'certfilename': String or None
+    #   'backupPath': String or None
+    #   'datarange': String or None
     # }
 
     config, warnings, errors = process_cline()
@@ -669,12 +699,15 @@ def connect_and_login(config):
     return server
 
 
-def create_folder_structure(names):
+def create_folder_structure(names,config):
     """ Create the folder structure on disk """
     for imap_foldername, filename in sorted(names):
         disk_foldername = os.path.split(filename)[0]
         if disk_foldername:
             try:
+                #create directory if not exists
+                if not os.path.exists(os.path.dirname(filename)):
+                    os.makedirs(os.path.dirname(filename))
                 # print "*** mkdir:", disk_foldername  # *DEBUG
                 os.mkdir(disk_foldername)
             except OSError, e:
@@ -687,8 +720,7 @@ def main():
     try:
         config = get_config()
         server = connect_and_login(config)
-        names = get_names(server, config['compress'], config['thunderbird'],
-                          config['nospinner'])
+        names = get_names(server, config)
         if config.get('folders'):
             dirs = map(lambda x: x.strip(), config.get('folders').split(','))
             if config['thunderbird']:
@@ -699,15 +731,14 @@ def main():
         # for n, name in enumerate(names): # *DEBUG
         #   print n, name # *DEBUG
 
-        create_folder_structure(names)
+        create_folder_structure(names,config)
 
         for name_pair in names:
             try:
                 foldername, filename = name_pair
                 fol_messages = scan_folder(
                     server, foldername, config['nospinner'], config['datarange'])
-                fil_messages = scan_file(filename, config['compress'],
-                                         config['overwrite'], config['nospinner'])
+                fil_messages = scan_file(filename, config)
                 new_messages = {}
                 for msg_id in fol_messages.keys():
                     if msg_id not in fil_messages:
