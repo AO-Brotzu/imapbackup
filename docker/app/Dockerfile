@@ -1,10 +1,10 @@
-FROM snakepacker/python:2.6
+FROM snakepacker/python:2.7
 
 USER root
 
 RUN apt-get update && apt-get -y install sudo && apt-get -y install iputils-ping  && apt-get -y install vim
 
-RUN ln -s /usr/bin/python2.6 /usr/bin/python2 && ln -s /usr/bin/python2 /usr/bin/python
+RUN ln -s /usr/bin/python2.7 /usr/bin/python2 && ln -s /usr/bin/python2 /usr/bin/python
 
 RUN ln -s /opt/aob/imapbackup/bin/imapbackup.sh /usr/bin/imapbackup
 

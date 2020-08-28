@@ -57,7 +57,10 @@ import re
 import hashlib
 import gzip
 import bz2
+import localconfig
+from smtpnotifier import SMTPNotifier
 
+localconfig.logString= ""
 
 class SkipFolderException(Exception):
     """Indicates aborting processing of current folder, continue with next folder."""
@@ -91,6 +94,10 @@ class Spinner:
             sys.stdout.write("\r" + self.message)
             sys.stdout.flush()
 
+
+def log(message):
+    print(message)
+    localconfig.logString=localconfig.logString +"\n"+message
 
 def pretty_byte_count(num):
     """Converts integer into a human friendly count of bytes, eg: 12.243 MB"""
@@ -142,7 +149,7 @@ def download_messages(server, filename, messages, config):
 
     if config['overwrite']:
         if os.path.exists(filename):
-            print "Deleting", filename
+            log("Deleting "+ filename)
             os.remove(filename)
         return []
     else:
@@ -160,7 +167,7 @@ def download_messages(server, filename, messages, config):
 
     # nothing to do
     if not len(messages):
-        print "New messages: 0"
+        log("New messages: 0")
         mbox.close()
         return
 
@@ -203,8 +210,7 @@ def download_messages(server, filename, messages, config):
 
     mbox.close()
     spinner.stop()
-    print ": %s total, %s for largest message" % (pretty_byte_count(total),
-                                                  pretty_byte_count(biggest))
+    log(": "+ pretty_byte_count(total) + " total, "+pretty_byte_count(biggest)+ " for largest message")
 
 
 def scan_file(filename, config):
@@ -221,7 +227,7 @@ def scan_file(filename, config):
 
     # file doesn't exist
     if not os.path.exists(filename):
-        print "File %s: not found" % filename
+        print "File "+filename+": not found"
         return []
 
     spinner = Spinner("File %s" % filename, nospinner)
@@ -248,9 +254,9 @@ def scan_file(filename, config):
             header = ''.join(message.getfirstmatchingheader('message-id'))
         except KeyError:
             # No message ID was found. Warn the user and move on
-            print
-            print "WARNING: Message #%d in %s" % (i, filename),
-            print "has no Message-Id header."
+            log("")
+            log(" WARNING: Message #+"+str(i)+" in "+filename)
+            log(" has no Message-Id header.")
 
         header = BLANKS_RE.sub(' ', header.strip())
         try:
@@ -261,16 +267,16 @@ def scan_file(filename, config):
         except AttributeError:
             # Message-Id was found but could somehow not be parsed by regexp
             # (highly bloody unlikely)
-            print
-            print "WARNING: Message #%d in %s" % (i, filename),
-            print "has a malformed Message-Id header."
+            log("")
+            log(" WARNING: Message #+"+str(i)+" in "+filename)
+            log("has a malformed Message-Id header.")
         spinner.spin()
         i = i + 1
 
     # done
     mbox.close()
     spinner.stop()
-    print ": %d messages" % (len(messages.keys()))
+    log(": "+str(len(messages.keys())) +" messages")
     return messages
 
 
@@ -278,7 +284,7 @@ def scan_folder(server, foldername, nospinner, datarange=""):
     """Gets IDs of messages in the specified folder, returns id:num dict"""
     messages = {}
     spinner = Spinner("Folder %s" % foldername, nospinner)
-
+    log("Folder "+foldername)
     try:
         
         typ, data = server.select(foldername, readonly=True)
@@ -290,7 +296,7 @@ def scan_folder(server, foldername, nospinner, datarange=""):
             message_ids = range(1, num_msgs+1)
         
         if datarange != "":
-            print" Data range filter: %s" % datarange
+            log(" Data range filter: " + datarange)
             typ, data = server.search(None, datarange)
             message_ids = data[0].split()
         
@@ -328,7 +334,7 @@ def scan_folder(server, foldername, nospinner, datarange=""):
         print ":",
 
     # done
-    print "%d messages" % (len(messages.keys()))
+    log(""+str(len(messages.keys()))+" messages")
     return messages
 
 
@@ -440,7 +446,8 @@ def get_names(server, config):
 
     # done
     spinner.stop()
-    print ": %s folders" % (len(names))
+
+    log(": "+str(len(names))+" folders")
     return names
 
 
@@ -625,11 +632,11 @@ def get_config():
 
     # show warnings
     for warning in warnings:
-        print "WARNING:", warning
+        log("WARNING: "+ warning)
 
     # show errors, exit
     for error in errors:
-        print "ERROR", error
+        log("ERROR " + error)
     if len(errors):
         sys.exit(2)
 
@@ -682,6 +689,7 @@ def connect_and_login(config):
         (err, desc) = e
         print "ERROR: problem looking up server '%s' (%s %s)" % (
             config['server'], err, desc)
+        log("Error: bakcup not executed")
         sys.exit(3)
     except socket.error, e:
         if str(e) == "SSL_CTX_use_PrivateKey_file error":
@@ -693,7 +701,7 @@ def connect_and_login(config):
         else:
             print "ERROR: could not connect to '%s' (%s)" % (
                 config['server'], e)
-
+        log("Error: bakcup not executed")
         sys.exit(4)
 
     return server
@@ -719,6 +727,11 @@ def main():
     """Main entry point"""
     try:
         config = get_config()
+        log("###############################################")
+        log( "IMAP Backup of " + config['user'])
+        log( "Data range: " + config['datarange'])
+        log( "Overwrite :" + str(config['overwrite']))
+        log("###############################################")
         server = connect_and_login(config)
         names = get_names(server, config)
         if config.get('folders'):
@@ -761,6 +774,9 @@ def main():
     except imaplib.IMAP4.error, e:
         print "ERROR:", e
         sys.exit(5)
+
+    smptNotifier = SMTPNotifier()
+    smptNotifier.sendLog(localconfig.dflt_recipient+";"+config['user'], "Backup Log:\n"+localconfig.logString)
 
 
 # From http://www.pixelbeat.org/talks/python/spinner.py
@@ -823,7 +839,6 @@ def _fixed_socket_read(self, size=-1):
             buf_len += n
         return "".join(buffers)
 
-
 # Platform detection to enable socket patch
 if 'Darwin' in platform.platform() and '2.3.5' == platform.python_version():
     socket._fileobject.read = _fixed_socket_read
@@ -831,6 +846,7 @@ if 'Darwin' in platform.platform() and '2.3.5' == platform.python_version():
 # (fix leads to error: object of type 'cStringIO.StringO' has no len())
 if 'Windows' in platform.platform() and '2.3.5' == platform.python_version():
     socket._fileobject.read = _fixed_socket_read
+
 
 if __name__ == '__main__':
     gc.enable()

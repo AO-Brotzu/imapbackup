@@ -35,10 +35,6 @@ if [ "$datarange" = "" ]; then
   echo "datarange = $datarange"
 fi 
 
-#if [ "$datarange" = "" ]; then
-#echo "python ../py/imapbackup.py -s imaps.pec.aruba.it -u $uname -p $passwd -d '$datarange' -b $backupPath --ssl --thunderbird" | bash
-#else 
 echo "python ../py/imapbackup.py -s imaps.pec.aruba.it -u $uname -p $passwd -d '$datarange' --backup-path=\"$backupPath\" --ssl" 
 
 echo "python ../py/imapbackup.py -s imaps.pec.aruba.it -u $uname -p $passwd -d '$datarange' --backup-path=\"$backupPath\" --ssl" | bash
-#fi
