@@ -4,8 +4,9 @@ uname=""
 passwd=""
 datarange=""
 backupPath="./"
+monthsago=0
 
-while getopts ":u:p:d:b:" option; do
+while getopts ":u:p:d:b:m:" option; do
   case $option in
     u ) uname=$OPTARG
     ;;
@@ -14,6 +15,8 @@ while getopts ":u:p:d:b:" option; do
     d ) datarange=${OPTARG}
     ;;
     b ) backupPath=${OPTARG}
+    ;;
+    m ) monthsago=${OPTARG}
     ;;
   esac
 done
@@ -35,6 +38,14 @@ if [ "$datarange" = "" ]; then
   echo "datarange = $datarange"
 fi 
 
-echo "python ../py/imapbackup.py -s imaps.pec.aruba.it -u $uname -p $passwd -d '$datarange' --backup-path=\"$backupPath\" --ssl" 
+echo "monthsago =  $monthsago"
+if [ "$monthsago" \> 0 ]; then
+    startDate=$(date --date="$(date +'%Y-%m-01') - $monthsago month" +%d-%b-%Y)
+    endDate=$(date --date="$(date +'%Y-%m-01') - 1 second" +%d-%b-%Y)
+    datarange="(since \"$startDate\" before \"$endDate\")"
+    echo "datarange = $datarange"
+fi
 
-echo "python ../py/imapbackup.py -s imaps.pec.aruba.it -u $uname -p $passwd -d '$datarange' --backup-path=\"$backupPath\" --ssl" | bash
+echo "python2.7 ../py/imapbackup.py -s imaps.pec.aruba.it -u $uname -p $passwd -d '$datarange' --backup-path=\"$backupPath\" --ssl" 
+
+echo "python2.7 ../py/imapbackup.py -s imaps.pec.aruba.it -u $uname -p $passwd -d '$datarange' --backup-path=\"$backupPath\" --ssl" | bash

@@ -562,7 +562,11 @@ def process_cline():
 def dataRangePath(datarange):
     if datarange == "":
          return ""
-    return "datarangetodo/"
+    path = datarange.replace(" ","_")
+    path = path.replace("\"","")
+    path = path.replace("(","")
+    path = path.replace(")","")
+    return path+"/"
 
 def check_config(config, warnings, errors):
     """Checks the config for consistency, returns (config, warnings, errors)"""
