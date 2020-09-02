@@ -436,6 +436,9 @@ def get_names(server, config):
         # print "\n*** Folder:", foldername # *DEBUG
         # print "***   File:", filename # *DEBUG
 
+        if config['singleMbox'] == True:
+            filename = config['user']+"_"+dataRangeFilename(config['datarange'])+".mbox"
+
         filename = config['backupPath']+filename
 
         #create directory if not exists
@@ -461,7 +464,8 @@ def print_usage():
     print " -n --compress=none        Use one plain mbox file for each folder. (default)"
     print " -z --compress=gzip        Use mbox.gz files.  Appending may be very slow."
     print " -b --compress=bzip2       Use mbox.bz2 files. Appending not supported: use -y."
-    print " -f --=folder              Specifify which folders use.  Comma separated list."
+    print " -f --folder               Specifify which folders use.  Comma separated list."
+    print " -x --single-mbox          Specifify which folders use.  Comma separated list."
     print " -e --ssl                  Use SSL.  Port defaults to 993."
     print " -k KEY --key=KEY          PEM private key file for SSL.  Specify cert, too."
     print " -c CERT --cert=CERT       PEM certificate chain for SSL.  Specify key, too."
@@ -483,8 +487,8 @@ def process_cline():
     """Uses getopt to process command line, returns (config, warnings, errors)"""
     # read command line
     try:
-        short_args = "aynzbekt:c:s:u:p:f:d:"
-        long_args = ["append-to-mboxes", "yes-overwrite-mboxes","data-range=" "compress=",
+        short_args = "aynzbekt:c:s:u:p:f:d:x:"
+        long_args = ["append-to-mboxes", "yes-overwrite-mboxes","single-mbox","data-range=" "compress=",
                      "ssl", "timeout", "keyfile=", "certfile=", "server=", "user=", "pass=",
                      "folders=", "thunderbird", "nospinner","backup-path="]
         opts, extraargs = getopt.getopt(sys.argv[1:], short_args, long_args)
@@ -492,7 +496,7 @@ def process_cline():
         print_usage()
 
     warnings = []
-    config = {'compress': 'none', 'overwrite': False, 'datarange':'', 'usessl': True,
+    config = {'compress': 'none', 'overwrite': False,'singleMbox': False, 'datarange':'', 'usessl': True,
               'thunderbird': False, 'nospinner': False, 'backupPath':'./'}
     errors = []
 
@@ -507,6 +511,8 @@ def process_cline():
         elif option in ("-y", "--yes-overwrite-mboxes"):
             warnings.append("Existing mbox files will be overwritten!")
             config["overwrite"] = True
+        elif option in ("-x", "--single-mbox"):
+            config['singleMbox'] = True
         # data range filter, example '(since "27-Jul-2020" before "28-Jul-2020")'
         elif option in ("-d", "--data-range"):
             config['datarange'] = value
@@ -567,6 +573,18 @@ def dataRangePath(datarange):
     path = path.replace("(","")
     path = path.replace(")","")
     return path+"/"
+
+def dataRangeFilename(datarange):
+    if datarange == "":
+         return ""
+    path = datarange.replace(" ","_")
+    path = path.replace("\"","")
+    path = path.replace("(","")
+    path = path.replace(")","")
+    path = path.replace("since_","")
+    path = path.replace("before_","")
+    path = path.replace("-","")
+    return path
 
 def check_config(config, warnings, errors):
     """Checks the config for consistency, returns (config, warnings, errors)"""

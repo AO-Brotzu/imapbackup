@@ -46,6 +46,5 @@ if [ "$monthsago" \> 0 ]; then
     echo "datarange = $datarange"
 fi
 
-echo "python2.7 ../py/imapbackup.py -s imaps.pec.aruba.it -u $uname -p $passwd -d '$datarange' --backup-path=\"$backupPath\" --ssl" 
-
-echo "python2.7 ../py/imapbackup.py -s imaps.pec.aruba.it -u $uname -p $passwd -d '$datarange' --backup-path=\"$backupPath\" --ssl" | bash
+echo "python2.7 ../py/imapbackup.py -s imaps.pec.aruba.it -u $uname -p $passwd -d '$datarange' --backup-path=\"$backupPath\" --ssl --single-mbox" 
+echo "python2.7 ../py/imapbackup.py -s imaps.pec.aruba.it -u $uname -p $passwd -d '$datarange' --backup-path=\"$backupPath\" --ssl --single-mbox" | bash
